@@ -67,7 +67,7 @@ async function list_changed_paths(opts: {
   if (sync_all) {
     const out: string[] = [];
 
-    for (const root of ['modules', 'templates']) {
+    for (const root of ['modules', 'templates', 'mediawiki']) {
       walk_files(path.join(workspace, root), workspace, out);
     }
 
@@ -139,12 +139,12 @@ async function run(): Promise<void> {
     throw new Error(`WikiWire: config not found: ${full_config}`);
   }
 
-  const { sites, shared: shared_enabled, path_to_site } = load_config(full_config);
+  const { sites, shared: shared_enabled, path_to_site, groups } = load_config(full_config);
 
   for (const cred_site_id of site_creds_map.keys()) {
     if (!sites.has(cred_site_id)) {
       core.warning(
-        `WikiWire: site_credentials has key "${cred_site_id}" which is not a site id in wikiwire.toml`,
+        `WikiWire: site_credentials has key "${cred_site_id}" which is not a site in wikiwire.toml`,
       );
     }
   }
@@ -161,7 +161,12 @@ async function run(): Promise<void> {
   const jobs: sync_job[] = [];
 
   for (const file of changed) {
-    if (!file.startsWith('modules/') && !file.startsWith('templates/')) continue;
+    if (
+      !file.startsWith('modules/') &&
+      !file.startsWith('templates/') &&
+      !file.startsWith('mediawiki/')
+    )
+      continue;
 
     const parts = file.split('/').filter(Boolean);
     if (parts.some((p) => p.startsWith('_'))) {
@@ -174,7 +179,7 @@ async function run(): Promise<void> {
     if (path_segment === 'shared') {
       if (!shared_enabled) {
         throw new Error(
-          `WikiWire: ${file} uses modules/shared or templates/shared; set shared = true in wikiwire.toml or move the file under a site path`,
+          `WikiWire: ${file} uses modules/shared, templates/shared, or mediawiki/shared; set shared = true in wikiwire.toml or move the file under a site path`,
         );
       }
 
@@ -205,10 +210,51 @@ async function run(): Promise<void> {
       continue;
     }
 
+    if (path_segment === 'groups') {
+        const group_id = parts[2];
+        const group_cfg = groups.get(group_id);
+        if (!group_cfg) {
+            throw new Error(`WikiWire: unknown group "${group_id}" in ${file} (add [[groups]] with this id)`);
+        }
+
+        const full_file = path.join(workspace, file);
+        if (!fs.existsSync(full_file)) {
+          core.info(`WikiWire: skip missing or removed file ${file}`);
+          continue;
+        }
+
+        const ref = github.context.ref;
+        const seen_sites = new Set<string>();
+        for (const site_id of group_cfg.sites) {
+            if (seen_sites.has(site_id)) {
+                continue;
+            }
+            seen_sites.add(site_id);
+
+            const site_cfg = sites.get(site_id);
+            if (!site_cfg) {
+                throw new Error(`WikiWire: group "${group_id}" refers to unknown site "${site_id}"`);
+            }
+
+            if (site_cfg.default_branch && ref !== `refs/heads/${site_cfg.default_branch}`) {
+                core.info(`WikiWire: skip ${file} for site ${site_cfg.id} (ref ${ref} is not refs/heads/${site_cfg.default_branch})`);
+                continue;
+            }
+
+            const mapped = map_repo_path(file, {
+              css_content_model: site_cfg.css_content_model,
+            });
+            if (!mapped) continue;
+
+            jobs.push({ file, mapped, site_cfg });
+        }
+        continue;
+    }
+
     const site_cfg = path_to_site.get(path_segment);
     if (!site_cfg) {
       throw new Error(
-        `WikiWire: unknown path segment "${path_segment}" in ${file} (add [[sites]] whose id or host matches this directory name)`,
+        `WikiWire: unknown path segment "${path_segment}" in ${file} (add [[sites]] whose id or site matches this directory name)`,
       );
     }
 
@@ -298,9 +344,9 @@ async function run(): Promise<void> {
       job.mapped.title,
       text,
       `WikiWire: sync ${job.file}`,
-      job.mapped.content_model,
+        job.mapped.content_model,
     );
-    core.info(`WikiWire: updated ${job.mapped.title} on ${job.site_cfg.id}`);
+    core.info(`WikiWire: updated ${job.mapped.title} on ${job.site_cfg.site}`);
   }
 }
 

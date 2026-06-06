@@ -1,6 +1,6 @@
 # WikiWire specification
 
-WikiWire is a GitHub Action that syncs changed files under `modules/` and `templates/` to a MediaWiki site via the [Action API](https://www.mediawiki.org/wiki/API:Action_API). Credentials are supplied only through the action inputs (or workflow secrets), never through the config file.
+WikiWire is a GitHub Action that syncs changed files under `modules/`, `templates/`, and `mediawiki/` to a MediaWiki site via the [Action API](https://www.mediawiki.org/wiki/API:Action_API). Credentials are supplied only through the action inputs (or workflow secrets), never through the config file.
 
 ## Recommended repository layout
 
@@ -8,10 +8,13 @@ Wiki content lives under a **path segment** (second directory under `modules/` o
 
 - **Modules:** `modules/<path_segment>/<root_name>/…`
 - **Templates:** `templates/<path_segment>/<root_name>/…`
+- **MediaWiki:** `mediawiki/<path_segment>/…`
 
-Ideally `<path_segment>` is the site’s `host` in `wikiwire.toml`, but can also be its `id` value, if no `host` is set. Using the `host` value instead removes any ambiguity. That keeps a stable `id` in config while the repo folder can stay a hostname.
+The `<path_segment>` directory must match the effective path segment for the site: the `site` value when set in `wikiwire.toml`, otherwise the `id`. The loader indexes only this single derived segment (using the same `site` if present else `id` logic) and matches it when loading repo paths. Using an explicit `site` value removes ambiguity and keeps a stable `id` in config while the repo folder stays a short name.
 
-**Shared bucket (optional):** If `shared = true` in `wikiwire.toml`, `modules/shared/` and `templates/shared/` are synced to **every** configured site. Wiki titles are the same as for a single site (the `shared` segment is not part of the title). When `shared` is false, paths under `modules/shared/` or `templates/shared/` cause the action to fail with a clear error. If you want to name a subfolder shared but don't want to use the first-party WikiWire support, name the folder `_shared` instead.
+**Shared bucket (optional):** If `shared = true` in `wikiwire.toml`, `modules/shared/`, `templates/shared/`, and `mediawiki/shared/` are synced to **every** configured site. Wiki titles are the same as for a single site (the `shared` segment is not part of the title). When `shared` is false, paths under `modules/shared/`, `templates/shared/`, or `mediawiki/shared/` cause the action to fail with a clear error. If you want to name a subfolder shared but don't want to use the first-party WikiWire support, name the folder `_shared` instead.
+
+**Groups bucket (optional):** If `[[groups]]` are defined in `wikiwire.toml`, `modules/groups/<group_id>/`, `templates/groups/<group_id>/`, and `mediawiki/groups/<group_id>/` are synced to every site listed in that group.
 
 Example:
 
@@ -24,11 +27,12 @@ templates/obbywiki.com/Infobox/Infobox.template.wikitext
 templates/obbywiki.com/MonthNav/MonthNav.template.wikitext
 templates/obbywiki.com/MonthNav/styles.css
 modules/shared/CommonUtil/CommonUtil.module.lua
+modules/groups/agroup/CommonUtil/CommonUtil.module.lua
 ```
 
 You can see and use our live repository at https://github.com/obbywiki/modules.
 
-- `<path_segment>` must match a site’s `id` or `host`, or be the literal `shared` (when `shared = true`).
+- `<path_segment>` must match a site's `id` or `site`, or be the literal `shared` (when `shared = true`), or be the literal `groups` (followed by a third segment `<group_id>` for the group feature).
 - `<root_name>` is the module or template root (e.g. `GroupLink`). For the main module file and template file, the basename in the filename must match `<root_name>`.
 
 ### Paths skipped automatically
@@ -45,6 +49,7 @@ Any path under `modules/` or `templates/` that contains a **path component start
 | `templates` | `templates/<path_segment>/<root>/<root>.template.wikitext` | `Template:<root>` | `wikitext` |
 | `templates` | `templates/<path_segment>/<root>/doc.wikitext` | `Template:<root>/doc` | `wikitext` |
 | `templates` | `templates/<path_segment>/<root>/<any other path>` | `Template:<root>/<any other path>` | See below |
+| `mediawiki` | `mediawiki/<path_segment>/<any path>` | `MediaWiki:<any path>` | See below |
 
 Any other file under `modules/<path_segment>/<root>/` maps 1:1: the wiki subpage path is exactly the relative path under `<root>/`, including nested directories (for example `i18n/en.json` becomes `Module:GroupLink/i18n/en.json`).
 
@@ -64,6 +69,7 @@ Suffix matching is ordered; the first match wins:
 | `*.wikitext` | `wikitext` |
 | `*.css` | Per-site `css_content_model` in `wikiwire.toml` (default `sanitized-css`) |
 | `*.json` | `json` |
+| `*.js` | `javascript` |
 | Anything else | Error: unsupported extension |
 
 (**TODO**: these should be ignored instead, such as README.md)
@@ -79,6 +85,7 @@ Suffix matching uses the same order as under `modules/`, with one restriction: `
 | `*.wikitext` | `wikitext` |
 | `*.css` | Per-site `css_content_model` in `wikiwire.toml` (default `sanitized-css`) |
 | `*.json` | `json` |
+| `*.js` | `javascript` |
 | Anything else | Error: unsupported extension |
 
 Some wikis may reject certain content models on `Template:` subpages; in that case the Action API returns an error, similar to unusual `Module:` subpages.
@@ -102,7 +109,7 @@ Place at the repository root unless you override with the `config_path` action i
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
 | `id` | string | yes | Stable site key (sessions, logs). Must be unique across rows. |
-| `host` | string | no | Directory name under `modules/` and `templates/`. If omitted, defaults to `id`. Must be unique across sites. Cannot be `shared` when `shared = true` (that name is reserved). |
+| `site` | string | no | Directory name under `modules/` and `templates/`. If omitted, defaults to `id`. Must be unique across sites. Cannot be `shared` or `groups` (reserved names). |
 | `api` | string | yes | Full MediaWiki API URL, e.g. `https://example.org/w/api.php`. |
 | `dry_run` | boolean | no | If true, only log planned edits; no `action=edit` requests for this site. |
 | `default_branch` | string | no | If set, the action skips syncing when the workflow ref is not this branch (e.g. `refs/heads/main`). |
@@ -123,7 +130,7 @@ api = "https://obbywiki.com/w/api.php"
 
 [[sites]]
 id = "dev"
-host = "dev.example.org"
+site = "dev.example.org"
 api = "https://dev.example.org/w/api.php"
 dry_run = true
 default_branch = "main"
@@ -131,6 +138,21 @@ css_content_model = "css"
 ```
 
 Credentials are **not** stored in this file. Use action inputs backed by secrets.
+
+### `[[groups]]` (repeatable)
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `id` | string | yes | Directory name under `modules/groups/` and `templates/groups/`. |
+| `sites` | string[] | yes | List of site `id` values that belong to this group. |
+
+Example:
+
+```toml
+[[groups]]
+id = "agroup"
+sites = ["wiki1", "wiki2", "wiki3"]
+```
 
 ## `.wikiwireignore`
 
@@ -157,7 +179,7 @@ Please note that WikiWire is currently a BETA and this shouldn't be required in 
 |-------|----------|---------|-------------|
 | `username` | no | `""` | Default bot username for sites not listed in `site_credentials`. With [Bot passwords](https://www.mediawiki.org/wiki/Manual:Bot_passwords), use `UserName@BotPasswordName`. |
 | `password` | no | `""` | Default bot password for sites not listed in `site_credentials`. |
-| `site_credentials` | no | `""` | JSON object whose keys are site `id` values from `wikiwire.toml` (not `host`). Each value must be `{"username":"…","password":"…"}`. Overrides the global `username` / `password` for that site. Keys that do not match any configured site produce a workflow warning. |
+| `site_credentials` | no | `""` | JSON object whose keys are site `id` values from `wikiwire.toml` (not `site`). Each value must be `{"username":"…","password":"…"}`. Overrides the global `username` / `password` for that site. Keys that do not match any configured site produce a workflow warning. |
 | `config_path` | no | `wikiwire.toml` | Path to the TOML config. |
 | `ignore_path` | no | `.wikiwireignore` | Path to the ignore file (may be missing). |
 | `dry_run` | no | `false` | If `true`, no edits are sent (site-level `dry_run` in TOML still applies per site). |
@@ -181,6 +203,8 @@ on:
       - 'modules/*'
       - 'templates/**'
       - 'templates/*'
+      - 'mediawiki/**'
+      - 'mediawiki/*'
 
 jobs:
   wikiwire:
@@ -239,6 +263,7 @@ on:
     paths:
       - 'modules/**'
       - 'templates/**'
+      - 'mediawiki/**'
 
 jobs:
   darklua_check:

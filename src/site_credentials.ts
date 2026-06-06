@@ -20,10 +20,10 @@ export function parse_site_credentials(raw: string): Map<string, site_credential
 
   const out = new Map<string, site_credentials>();
 
-  for (const [site_id, value] of Object.entries(parsed as Record<string, unknown>)) {
+  for (const [site_key, value] of Object.entries(parsed as Record<string, unknown>)) {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
       throw new Error(
-        `WikiWire: site_credentials["${site_id}"] must be a JSON object with username and password`,
+        `WikiWire: site_credentials["${site_key}"] must be a JSON object with username and password`,
       );
     }
 
@@ -31,20 +31,20 @@ export function parse_site_credentials(raw: string): Map<string, site_credential
 
     if (typeof rec.username !== 'string' || typeof rec.password !== 'string') {
       throw new Error(
-        `WikiWire: site_credentials["${site_id}"] must have string username and password`,
+        `WikiWire: site_credentials["${site_key}"] must have string username and password`,
       );
     }
 
     const username = rec.username.trim();
-    const password = rec.password.trim();
+    const password = rec.password;
 
-    if (!username || !password) {
+    if (!username || password.trim().length === 0) {
       throw new Error(
-        `WikiWire: site_credentials["${site_id}"] must have non-empty username and password`,
+        `WikiWire: site_credentials["${site_key}"] must have non-empty username and password`,
       );
     }
 
-    out.set(site_id, { username, password });
+    out.set(site_key, { username, password });
   }
 
   return out;
