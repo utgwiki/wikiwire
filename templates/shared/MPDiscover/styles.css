@@ -98,6 +98,7 @@ body:not(.ns-0) .citizen-page-header { margin-bottom: 20px }
     background-color: var(--hueshift); 
     background-size: cover;
     background-position: center;
+    background-blend-mode: color-burn;
     border: 1px solid var(--unhovered);
     filter: drop-shadow(0px 5px 0px var(--unhovered));
     position: absolute;
@@ -107,19 +108,19 @@ body:not(.ns-0) .citizen-page-header { margin-bottom: 20px }
     z-index: -1;
 }
 
-.mpdiscover .socialbutton.main::before {
+.mpdiscover .socialbutton.main:not(:hover)::before {
     background-image: url(https://static.wikitide.net/utgwiki/1/18/UTGThumbnailOld.png);
 }
 
-.mpdiscover .socialbutton.legacy::before {
+.mpdiscover .socialbutton.legacy:not(:hover)::before {
     background-image: url(https://static.wikitide.net/utgwiki/d/db/CrossroadsThumbnail.png);
 }
 
-.mpdiscover .socialbutton.dev::before {
+.mpdiscover .socialbutton.dev:not(:hover)::before {
     background-image: url(https://static.wikitide.net/utgwiki/f/f6/Utgtemplatemovementguides.png);
 }
 
-.mpdiscover .socialbutton.farm::before {
+.mpdiscover .socialbutton.farm:not(:hover)::before {
     background-image: url(https://static.wikitide.net/farmwiki/2/2c/UFG2.png);
 }
 
