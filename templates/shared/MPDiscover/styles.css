@@ -89,13 +89,15 @@ body:not(.ns-0) .citizen-page-header { margin-bottom: 20px }
     color: var(--fixedlinkcolor);
 
     --unhovered: oklch(0.3349 0.1 var(--hueshiftvalue, var(--color-progressive-oklch__h)));
-    --hueshift: oklch(from var(--color-surface-4) l c var(--hueshiftvalue, h));
+    --hueshift: oklch(from var(--color-surface-4) l c var(--hueshiftvalue, h) / 80%);
     --fixedlinkcolor: oklch(from var(--color-link) l c var(--hueshiftvalue, h));
 }
 
 .mpdiscover .socialbutton::before {
     border-radius: var(--border-radius-medium); 
-    background: var(--hueshift); 
+    background-color: var(--hueshift); 
+    background-size: cover;
+    background-position: center;
     border: 1px solid var(--unhovered);
     filter: drop-shadow(0px 5px 0px var(--unhovered));
     position: absolute;
@@ -103,6 +105,22 @@ body:not(.ns-0) .citizen-page-header { margin-bottom: 20px }
     width: 100%; height: 100%;
     content: '';
     z-index: -1;
+}
+
+.mpdiscover .socialbutton.main::before {
+    background-image: url(https://static.wikitide.net/utgwiki/1/18/UTGThumbnailOld.png);
+}
+
+.mpdiscover .socialbutton.legacy::before {
+    background-image: url(https://static.wikitide.net/utgwiki/d/db/CrossroadsThumbnail.png);
+}
+
+.mpdiscover .socialbutton.dev::before {
+    background-image: url(https://static.wikitide.net/utgwiki/f/f6/Utgtemplatemovementguides.png);
+}
+
+.mpdiscover .socialbutton.farm::before {
+    background-image: url(https://static.wikitide.net/farmwiki/2/2c/UFG2.png);
 }
 
 .mpdiscover .socialbutton img { width: 100%; height: 100%; object-fit: contain; border-radius: 0!important; transition: .25s transform }
